@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Gelora:Embodied Alienation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            font-family: Arial; 
+            overflow: hidden; 
+            background: #0a0a0a;
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+        
+        .ground-instructions {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.4);
+            color: rgba(255,255,255,0.8);
+            padding: 8px 16px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 10px;
+            backdrop-filter: blur(3px);
+            font-weight: 300;
+        }
+        
+        .awareness-counter {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            background: rgba(0,0,0,0.3);
+            color: rgba(255,255,255,0.7);
+            padding: 5px 8px;
+            border-radius: 8px;
+            font-weight: 300;
+            font-size: 9px;
+            backdrop-filter: blur(2px);
+        }
+        
+        /* Glowing dots positioned on ground */
+        .glowing-dot {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            pointer-events: all;
+            cursor: grab;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px currentColor;
+            border: 2px solid currentColor;
+            opacity: 0.8;
+        }
+        
+        .glowing-dot:active {
+            cursor: grabbing;
+            transform: scale(1.2);
+        }
+        
+        .dot-green {
+            background: radial-gradient(circle, rgba(0,255,127,0.6) 0%, rgba(0,255,127,0.2) 70%, transparent 100%);
+            color: rgba(0,255,127,1);
+            top: 40%;
+            right: 15%;
+            animation: pulseGreen 2s ease-in-out infinite;
+        }
+        
+        .dot-pink {
+            background: radial-gradient(circle, rgba(255,20,147,0.6) 0%, rgba(255,20,147,0.2) 70%, transparent 100%);
+            color: rgba(255,20,147,1);
+            bottom: 20%;
+            left: 40%;
+            animation: pulsePink 2s ease-in-out infinite;
+        }
+        
+        .dot-white {
+            background: radial-gradient(circle, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.2) 70%, transparent 100%);
+            color: rgba(255,255,255,1);
+            top: 40%;
+            left: 15%;
+            animation: pulseWhite 2s ease-in-out infinite;
+        }
+        
+        .dot-blue {
+            background: radial-gradient(circle, rgba(173,216,230,0.6) 0%, rgba(173,216,230,0.2) 70%, transparent 100%);
+            color: rgba(173,216,230,1);
+            top: 15%;
+            left: 45%;
+            animation: pulseBlue 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulseGreen {
+            0%, 100% { box-shadow: 0 0 20px rgba(0,255,127,0.8); }
+            50% { box-shadow: 0 0 30px rgba(0,255,127,1), 0 0 40px rgba(0,255,127,0.6); }
+        }
+        
+        @keyframes pulsePink {
+            0%, 100% { box-shadow: 0 0 20px rgba(255,20,147,0.8); }
+            50% { box-shadow: 0 0 30px rgba(255,20,147,1), 0 0 40px rgba(255,20,147,0.6); }
+        }
+        
+        @keyframes pulseWhite {
+            0%, 100% { box-shadow: 0 0 20px rgba(255,255,255,0.8); }
+            50% { box-shadow: 0 0 30px rgba(255,255,255,1), 0 0 40px rgba(255,255,255,0.6); }
+        }
+        
+        @keyframes pulseBlue {
+            0%, 100% { box-shadow: 0 0 20px rgba(173,216,230,0.8); }
+            50% { box-shadow: 0 0 30px rgba(173,216,230,1), 0 0 40px rgba(173,216,230,0.6); }
+        }
+        
+        /* Center target area */
+        .center-target {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 50%;
+            pointer-events: none;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        }
+        
+        .ground-complete {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.4);
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            border-radius: 15px;
+            font-size: 10px;
+            display: none;
+            text-align: center;
+            backdrop-filter: blur(3px);
+            font-weight: 300;
+        }
+    </style>
+</head>
+<body>
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
+        <!-- Container for ground-aware memories -->
+        <a-entity id="ground-container"></a-entity>
+        
+        <!-- Ground-level camera positioned close to the ground -->
+        <a-entity camera 
+                  position="0 0.3 0" 
+                  rotation="-15 0 0"
+                  look-controls="enabled: true; pointerLockEnabled: false" 
+                  wasd-controls="enabled: false">
+        </a-entity>
+    </a-scene>
+
+    <div class="overlay">
+        <div class="ground-instructions" id="instructions">
+            <span id="phase1">You are the soil</span>
+           <span id="phase2">Gather the elements</span>
+        </div>
+        
+        <div class="awareness-counter" id="progress">
+            <span id="count">0</span>/4
+        </div>
+        
+        <!-- Pre-positioned glowing dots -->
+        <div class="glowing-dot dot-green" id="dotGreen"></div>
+        <div class="glowing-dot dot-pink" id="dotPink"></div>
+        <div class="glowing-dot dot-white" id="dotWhite"></div>
+        <div class="glowing-dot dot-blue" id="dotBlue"></div>
+        
+        <!-- Center target -->
+        <div class="center-target" id="centerTarget"></div>
+        
+        <div class="ground-complete" id="groundComplete">
+            Gelora awakens <br>
+            <small>Feel around and touch </small>
+        </div>
+    </div>
+
+    <script>
+        // Elemental configuration with unique motions for each element
+        const elementalMemories = [
+            {
+                id: 'wood-gelora',
+                element: 'wood',
+                src: 'east-piece.glb',
+                dotId: 'dotGreen',
+                scale: 0.9,
+                position: { x: 2.0, y: -1.6, z: -1.8 },
+                motionType: 'organic-growth'
+            },
+            {
+                id: 'fire-gelora',
+                element: 'fire',
+                src: 'south-piece.glb',
+                dotId: 'dotPink',
+                scale: 0.7, // Reduced from 0.6 to 0.48 (0.6 * 0.8)
+                position: { x: -1.5, y: -1.3, z: -0.9 }, // Moved from x: -1.2 to x: -0.8 for spacing
+                motionType: 'energetic-burst'
+            },
+            {
+                id: 'metal-gelora',
+                element: 'metal',
+                src: 'west-piece.glb',
+                dotId: 'dotWhite',
+                scale: 0.9,
+                position: { x: -1.0, y: -1.2, z: -2.5 }, // Updated from x: -2.2 to x: -1.7 (+0.5)
+                motionType: 'crystalline-precise'
+            },
+            {
+                id: 'water-gelora',
+                element: 'water',
+                src: 'north-piece.glb',
+                dotId: 'dotBlue',
+                scale: 0.9,
+                position: { x: 1.8, y: -1.0, z: -2.8 },
+                motionType: 'fluid-flow'
+            }
+        ];
+
+        let groundCount = 0;
+        const awakenedMemories = new Set();
+        let draggedDots = new Set();
+        
+        // Get center target position
+        function getCenterPosition() {
+            const target = document.getElementById('centerTarget');
+            const rect = target.getBoundingClientRect();
+            return {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+            };
+        }
+        
+        // Check if dot is in center
+        function isInCenter(dotElement) {
+            const dotRect = dotElement.getBoundingClientRect();
+            const dotCenter = {
+                x: dotRect.left + dotRect.width / 2,
+                y: dotRect.top + dotRect.height / 2
+            };
+            
+            const centerPos = getCenterPosition();
+            const distance = Math.sqrt(
+                Math.pow(dotCenter.x - centerPos.x, 2) + 
+                Math.pow(dotCenter.y - centerPos.y, 2)
+            );
+            
+            return distance < 50;
+        }
+
+        // Apply elemental-specific animations based on element type
+        function applyElementalMotion(memory, elementType, scale) {
+            switch(elementType) {
+                case 'wood':
+                    // WOOD: Slow, organic growth like a tree
+                    memory.setAttribute('animation__wood-emerge', 
+                        'property: position; from: 0 -1.0 -1.5; to: 0 0.2 -1.5; ' +
+                        'dur: 4000; easing: easeOutQuart; startEvents: emergeAtCenter'
+                    );
+                    
+                    memory.setAttribute('animation__wood-grow', 
+                        `property: scale; from: 0.01 0.01 0.01; to: ${scale * 1.5} ${scale * 1.5} ${scale * 1.5}; ` +
+                        'dur: 5000; easing: easeOutElastic; startEvents: growAtCenter'
+                    );
+                    
+                    // Slow, organic 360-degree rotation like seasonal growth
+                    memory.setAttribute('animation__wood-rotate360', 
+                        'property: rotation; from: 0 0 0; to: 0 360 0; ' +
+                        'dur: 8000; easing: linear; loop: true; startEvents: finalMotion'
+                    );
+
+                     // Gentle tree swaying (z-axis)
+                    memory.setAttribute('animation__wood-sway', 
+                        'property: rotation; from: 0 0 -3; to: 0 0 3; ' +
+                        'dir: alternate; dur: 4000; easing: easeInOutSine; loop: true; startEvents: finalMotion'
+                    );
+                    
+                    // Organic x-axis swaying like tree branches in wind
+                    memory.setAttribute('animation__wood-drift', 
+                        'property: position; from: 2.0 -0.7 -1.8; to: 1.2 -0.7 -1.8; ' +
+                        'dir: alternate; dur: 8000; easing: easeInOutSine; loop: true; startEvents: finalMotion'
+                    );
+                    break;
+                    
+
+                case 'fire':
+                    // FIRE: Quick, explosive burst
+                    memory.setAttribute('animation__fire-burst', 
+                        'property: position; from: 0 -1.0 -1.5; to: 0 0.3 -1.5; ' +
+                        'dur: 1200; easing: easeOutBack; startEvents: emergeAtCenter'
+                    );
+                    
+                    memory.setAttribute('animation__fire-explode', 
+                        `property: scale; from: 0.01 0.01 0.01; to: ${scale * 4.3} ${scale * 4.3} ${scale * 4.3}; ` +
+                        'dur: 800; easing: easeOutBack; startEvents: growAtCenter'
+                    );
+                    
+                    memory.setAttribute('animation__fire-settle', 
+                        `property: scale; from: ${scale * 4.3} ${scale * 4.3} ${scale * 4.3}; to: ${scale} ${scale} ${scale}; ` +
+                        'dur: 600; easing: easeInQuart; startEvents: settleScale'
+                    );
+                    
+                    // Dynamic dancing 360-degree rotation like flickering flames
+                    memory.setAttribute('animation__fire-rotate360', 
+                        'property: rotation; from: 0 0 0; to: 0 360 0; ' +
+                        'dur: 8000; easing: easeInOutSine; loop: true; startEvents: finalMotion'
+                    );
+                    
+                    // Slower heartbeat-like pulsing (like breathing heart)
+                    memory.setAttribute('animation__fire-heartbeat', 
+                        `property: scale; from: ${scale * 0.95} ${scale * 0.95} ${scale * 0.95}; to: ${scale * 1.05} ${scale * 1.05} ${scale * 1.05}; ` +
+                        'dir: alternate; dur: 1800; easing: easeInOutSine; loop: true; startEvents: finalMotion'
+                    );
+                    break;
+
+                case 'metal':
+                    // METAL: Crystalline, geometric precision
+                    memory.setAttribute('animation__metal-crystallize', 
+                        'property: position; from: 0 -1.0 -1.5; to: 0 0.1 -1.5; ' +
+                        'dur: 1000; easing: easeOutCubic; startEvents: emergeAtCenter'
+                    );
+                    
+                    memory.setAttribute('animation__metal-form', 
+                        `property: scale; from: 0.01 0.01 0.01; to: ${scale} ${scale} ${scale}; ` +
+                        'dur: 1500; easing: easeOutCubic; startEvents: growAtCenter'
+                    );
+                    
+                    // Precise, mechanical 360-degree rotation with pauses
+                    memory.setAttribute('animation__metal-rotate360', 
+                        'property: rotation; from: 0 0 0; to: 0 360 0; ' +
+                        'dur: 9000; easing: easeInOutCubic; loop: true; startEvents: finalMotion'
+                    );
+
+                    // Additional geometric tilt rotation (x-axis)
+                    memory.setAttribute('animation__metal-tilt', 
+                        'property: rotation; from: -10 0 0; to: 10 0 0; ' +
+                        'dir: alternate; dur: 4000; easing: easeInOutCubic; loop: true; startEvents: finalMotion'
+                    );
+                    
+                    // Precise x-axis sliding movement like crystalline shifting
+                    memory.setAttribute('animation__metal-slide', 
+                        'property: position; from: -2.1 -0.6 -2.5; to: 1.0 -0.6 -2.5; ' +
+                        'dir: alternate; dur: 6700; easing: easeInOutCubic; loop: true; startEvents: finalMotion'
+                    );
+                    break;
+                    
+                case 'water':
+                    // WATER: Fluid, wave-like emergence
+                    memory.setAttribute('animation__water-flow', 
+                        'property: position; from: 0 -3.0 -1.5; to: 0 0.15 -1.5; ' +
+                        'dur: 5000; easing: easeOutElastic; startEvents: emergeAtCenter'
+                    );
+                    
+                    memory.setAttribute('animation__water-ripple', 
+                        `property: scale; from: ${scale} 0.01 ${scale}; to: ${scale} ${scale} ${scale}; ` +
+                        'dur: 3500; easing: easeOutElastic; startEvents: growAtCenter'
+                    );
+                    
+                    // Gentle, flowing 360-degree rotation like water currents
+                    memory.setAttribute('animation__water-rotate360', 
+                        'property: rotation; from: 0 0 0; to: 0 360 0; ' +
+                        'dur: 18000; easing: easeInOutSine; loop: true; startEvents: finalMotion'
+                    );
+                    
+                    // Flowing undulation (vertical movement)
+                    memory.setAttribute('animation__water-undulate', 
+                        'property: position; from: 0 -1.1 -1.5; to: 0 0.25 -1.5; ' +
+                        'dir: alternate; dur: 9000; easing: easeInOutSine; loop: true; startEvents: finalMotion'
+                    );
+                    break;
+            }
+        }
+
+        // Drag functionality for each dot
+        function makeDraggable(dotElement, memoryConfig) {
+            let isDragging = false;
+            let startPos = { x: 0, y: 0 };
+            let currentPos = { x: 0, y: 0 };
+            
+            // Mouse events
+            dotElement.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', endDrag);
+            
+            // Touch events
+            dotElement.addEventListener('touchstart', startDrag, { passive: false });
+            document.addEventListener('touchmove', drag, { passive: false });
+            document.addEventListener('touchend', endDrag);
+            
+            function startDrag(e) {
+                if (draggedDots.has(dotElement.id)) return;
+                
+                isDragging = true;
+                dotElement.style.zIndex = '1000';
+                
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                
+                const rect = dotElement.getBoundingClientRect();
+                startPos.x = clientX - rect.left;
+                startPos.y = clientY - rect.top;
+                
+                e.preventDefault();
+            }
+            
+            function drag(e) {
+                if (!isDragging) return;
+                
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                
+                currentPos.x = clientX - startPos.x;
+                currentPos.y = clientY - startPos.y;
+                
+                dotElement.style.left = currentPos.x + 'px';
+                dotElement.style.top = currentPos.y + 'px';
+                dotElement.style.position = 'fixed';
+                
+                e.preventDefault();
+            }
+            
+            function endDrag(e) {
+                if (!isDragging) return;
+                
+                isDragging = false;
+                dotElement.style.zIndex = '999';
+                
+                if (isInCenter(dotElement)) {
+                    draggedDots.add(dotElement.id);
+                    awakenElementalMemory(memoryConfig);
+                    hideDot(dotElement);
+                }
+                
+                e.preventDefault();
+            }
+        }
+        
+        function hideDot(dotElement) {
+            dotElement.style.opacity = '0';
+            dotElement.style.pointerEvents = 'none';
+            setTimeout(() => {
+                dotElement.style.display = 'none';
+            }, 300);
+        }
+
+        function awakenElementalMemory(memoryConfig) {
+            const container = document.getElementById('ground-container');
+            
+            const memory = document.createElement('a-gltf-model');
+            memory.setAttribute('id', memoryConfig.id);
+            memory.setAttribute('src', memoryConfig.src);
+            memory.setAttribute('position', '0 -1.0 -1.5');
+            memory.setAttribute('scale', '0.01 0.01 0.01');
+            memory.setAttribute('visible', false);
+            
+            // Apply elemental-specific emergence and growth
+            applyElementalMotion(memory, memoryConfig.element, memoryConfig.scale);
+            
+            // Movement to final position (same timing for all)
+            memory.setAttribute('animation__move-to-final', 
+                'property: position; ' +
+                `from: 0 0.2 -1.5; to: ${memoryConfig.position.x} ${memoryConfig.position.y + 0.1} ${memoryConfig.position.z}; ` +
+                'dur: 8000; easing: easeInOutQuart; startEvents: moveToFinal'
+            );
+            
+            container.appendChild(memory);
+            
+            memory.addEventListener('model-loaded', function() {
+                setTimeout(() => {
+                    memory.setAttribute('visible', true);
+                    memory.emit('emergeAtCenter');
+                }, 100);
+                
+                setTimeout(() => {
+                    memory.emit('growAtCenter');
+                    if (memoryConfig.element === 'fire') {
+                        setTimeout(() => memory.emit('settleScale'), 800);
+                    }
+                }, 500);
+                
+                // Move to final position after emergence completes
+                const emergeDuration = memoryConfig.element === 'fire' ? 1400 : 
+                                     memoryConfig.element === 'wood' ? 15000 :
+                                     memoryConfig.element === 'water' ? 3500 : 2500;
+                
+                setTimeout(() => {
+                    memory.emit('moveToFinal');
+                }, emergeDuration + 1000);
+                
+                // Start final elemental motion + enable double-tap rotation
+                setTimeout(() => {
+                    memory.emit('finalMotion');
+                    enableDoubleTapRotation(memory);
+                }, emergeDuration + 9000);
+            });
+            
+            awakenedMemories.add(memoryConfig.id);
+            groundCount++;
+            updateGroundProgress();
+        }
+
+        function updateGroundProgress() {
+            document.getElementById('count').textContent = groundCount;
+            
+            if (groundCount >= 4) {
+                setTimeout(() => {
+                    document.getElementById('instructions').style.display = 'none';
+                    document.getElementById('centerTarget').style.display = 'none';
+                    document.getElementById('groundComplete').style.display = 'block';
+                }, 2000);
+            }
+        }
+
+        // Double-tap rotation for Geloras
+        function enableDoubleTapRotation(memory) {
+            let tapCount = 0;
+            let tapTimer = null;
+            let lastTapTime = 0;
+            
+            // Add cursor component to make it clickable
+            memory.setAttribute('cursor', 'rayOrigin: mouse');
+            
+            // Use A-Frame's click event
+            memory.addEventListener('click', handleClick);
+            
+            function handleClick(e) {
+                const currentTime = Date.now();
+                
+                // Check if this is a double-tap (within 400ms of previous tap)
+                if (currentTime - lastTapTime < 400) {
+                    // Double-tap detected!
+                    rotateGelora90Degrees(memory);
+                    lastTapTime = 0; // Reset to prevent triple-tap
+                } else {
+                    // First tap
+                    lastTapTime = currentTime;
+                }
+                
+                e.stopPropagation();
+            }
+            
+            function rotateGelora90Degrees(memory) {
+                // Get current rotation
+                const currentRotation = memory.getAttribute('rotation');
+                const newRotationY = currentRotation.y + 90;
+                
+                // Use A-Frame animation component
+                memory.setAttribute('animation__manual-rotate', {
+                    property: 'rotation',
+                    from: `${currentRotation.x} ${currentRotation.y} ${currentRotation.z}`,
+                    to: `${currentRotation.x} ${newRotationY} ${currentRotation.z}`,
+                    dur: 800,
+                    easing: 'easeInOutQuad'
+                });
+                
+                // Update rotation after animation
+                setTimeout(() => {
+                    memory.setAttribute('rotation', `${currentRotation.x} ${newRotationY} ${currentRotation.z}`);
+                    memory.removeAttribute('animation__manual-rotate');
+                }, 800);
+            }
+        }
+
+        // Initialize draggable dots
+        elementalMemories.forEach(memory => {
+            const dot = document.getElementById(memory.dotId);
+            makeDraggable(dot, memory);
+        });
+
+        // Enhanced zoom functionality with better pinch detection
+        let lastTouchDistance = 0;
+        let isZooming = false;
+        let initialDistance = 0;
+        let zoomSensitivity = 0.002; // Adjust for smoother zoom
+
+        function getTouchDistance(touch1, touch2) {
+            return Math.sqrt(
+                Math.pow(touch2.clientX - touch1.clientX, 2) +
+                Math.pow(touch2.clientY - touch1.clientY, 2)
+            );
+        }
+
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 2) {
+                isZooming = true;
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                initialDistance = getTouchDistance(touch1, touch2);
+                lastTouchDistance = initialDistance;
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 2 && isZooming) {
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const currentDistance = getTouchDistance(touch1, touch2);
+                
+                // Calculate scale factor based on distance change
+                const distanceChange = currentDistance - lastTouchDistance;
+                const scaleFactor = 1 + (distanceChange * zoomSensitivity);
+                
+                // Apply zoom with bounds checking
+                observeGround(scaleFactor);
+                lastTouchDistance = currentDistance;
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', function(e) {
+            if (e.touches.length < 2) {
+                isZooming = false;
+                initialDistance = 0;
+                lastTouchDistance = 0;
+            }
+        });
+
+        // Mouse wheel zoom support for desktop
+        document.addEventListener('wheel', function(e) {
+            if (awakenedMemories.size > 0) {
+                e.preventDefault();
+                const scaleFactor = e.deltaY > 0 ? 0.95 : 1.05;
+                observeGround(scaleFactor);
+            }
+        }, { passive: false });
+
+        function observeGround(scaleFactor) {
+            awakenedMemories.forEach(memoryId => {
+                const memory = document.getElementById(memoryId);
+                if (memory && memory.getAttribute('visible')) {
+                    const currentScale = memory.getAttribute('scale');
+                    const newScale = {
+                        x: Math.max(0.2, Math.min(1.5, currentScale.x * scaleFactor)),
+                        y: Math.max(0.2, Math.min(1.5, currentScale.y * scaleFactor)),
+                        z: Math.max(0.2, Math.min(1.5, currentScale.z * scaleFactor))
+                    };
+                    memory.setAttribute('scale', newScale);
+                }
+            });
+        }
+
+        // Reset functionality
+        function resetGroundAwareness() {
+            const container = document.getElementById('ground-container');
+            container.innerHTML = '';
+            
+            groundCount = 0;
+            awakenedMemories.clear();
+            draggedDots.clear();
+            
+            document.getElementById('count').textContent = '0';
+            document.getElementById('instructions').style.display = 'block';
+            document.getElementById('instructions').innerHTML = 'Channel elemental energies to center';
+            document.getElementById('centerTarget').style.display = 'block';
+            document.getElementById('groundComplete').style.display = 'none';
+            
+            elementalMemories.forEach(memory => {
+                const dot = document.getElementById(memory.dotId);
+                dot.style.display = 'block';
+                dot.style.opacity = '0.8';
+                dot.style.pointerEvents = 'all';
+                dot.style.position = 'absolute';
+                dot.style.zIndex = '999';
+            });
+        }
+
+        // Shake to reset
+        let shakeTimeout;
+        window.addEventListener('devicemotion', function(event) {
+            if (event.acceleration && 
+                (Math.abs(event.acceleration.x) > 12 || 
+                 Math.abs(event.acceleration.y) > 12 || 
+                 Math.abs(event.acceleration.z) > 12)) {
+                
+                clearTimeout(shakeTimeout);
+                shakeTimeout = setTimeout(resetGroundAwareness, 1000);
+            }
+        });
+
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
