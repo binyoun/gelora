@@ -170,7 +170,7 @@
 
     <div class="overlay">
         <div class="ground-instructions" id="instructions">
-            <span id="phase1">You are the soil</span>
+            <span id="phase1">You are the soil</span><br>
            <span id="phase2">Gather the elements</span>
         </div>
         
